@@ -6,7 +6,7 @@ The File Management System is a simple web application built in Go using the Gin
 ### Features:
 - JWT User authentication for secure access to the system.
 - API endpoints for uploading, downloading, and listing files.
-- Storage of uploaded files in a local folder.
+- Storage of uploaded files in a local folder(user_file_uploads/).
 - Recording file transactions in MongoDB, including upload, download, and update operations.
 - Retrieval of file transaction records via APIs.
 ### Additional features:

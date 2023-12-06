@@ -10,9 +10,9 @@ import (
 func FileRoutes(incomingRoutes *gin.Engine) {
 
 	incomingRoutes.POST("/upload", middleware.Authenticate(), controllers.UploadFile())
-	incomingRoutes.GET("/upload/:file_id", middleware.Authenticate(), controllers.DownloadFile())
-	incomingRoutes.DELETE("/upload/:file_id", controllers.DeleteFile())
-	incomingRoutes.GET("/upload", middleware.Authenticate(), controllers.RetrieveFiles())
+	incomingRoutes.GET("/download/:file_id", middleware.Authenticate(), controllers.DownloadFile())
+	incomingRoutes.DELETE("/upload/:file_id", middleware.Authenticate(), controllers.DeleteFile())
+	incomingRoutes.GET("/files", middleware.Authenticate(), controllers.RetrieveFiles())
 	incomingRoutes.GET("/transactions", middleware.Authenticate(), controllers.AllTransactions())
 
 }

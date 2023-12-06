@@ -3,13 +3,13 @@
 
 The File Management System is a simple web application built in Go using the Gin framework and MongoDB for file storage and tracking file transactions.
 
-## Features:
+### Features:
 - JWT User authentication for secure access to the system.
 - API endpoints for uploading, downloading, and listing files.
 - Storage of uploaded files in a local folder.
 - Recording file transactions in MongoDB, including upload, download, and update operations.
 - Retrieval of file transaction records via APIs.
-## Additional features:
+### Additional features:
 - Retrieval of file properties (file format, creation date, etc.).
 
 
@@ -27,20 +27,6 @@ Before running the Log Ingestor, ensure you have the following dependencies inst
 1. Go (Golang)
 2. MongoDB
 
-- Linux
-```bash
-sudo apt update
-sudo apt install mongodb
-```
-- macOS
-```bash
-brew tap mongodb/brew
-brew install mongodb-community
-```
-- Windows
-```bash
-Download and install MongoDB from the official website: [MongoDB Downloads](https://www.mongodb.com/try/download/community)
-```
 ## Installation
 
 1. Clone the repository

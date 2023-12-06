@@ -15,7 +15,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-var fileTransactionRecords = database.OpenCollection(database.Client, "files")
+var fileRecords = database.OpenCollection(database.Client, "fileRecords")
+var fileTransactions = database.OpenCollection(database.Client, "fileTransactions")
 
 func getFileFormat(filePath string) (string, error) {
 	file, err := os.Open(filePath)
@@ -43,7 +44,7 @@ func getFileById(fileID string) (*models.FileRecord, error) {
 	var record models.FileRecord
 
 	// Retrieve file information from the database using the file ID
-	err := fileTransactionRecords.FindOne(ctx, bson.M{"file_id": fileID}).Decode(&record)
+	err := fileRecords.FindOne(ctx, bson.M{"file_id": fileID}).Decode(&record)
 
 	if err != nil {
 		return nil, err
@@ -92,8 +93,23 @@ func UploadFile() gin.HandlerFunc {
 			FileSize:  file.Size,
 			Format:    fileFormat,
 		}
+		transaction := models.FileTransaction{
+			ID:        primitive.NewObjectID(),
+			FileId:    fileId.Hex(),
+			UserID:    userId.(string),
+			Operation: "upload",
+			FileName:  file.Filename,
+			Timestamp: time.Now(),
+			FileSize:  file.Size,
+		}
 
-		_, insertErr := fileTransactionRecords.InsertOne(ctx, record)
+		_, insertErr := fileRecords.InsertOne(ctx, record)
+
+		if insertErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": insertErr.Error()})
+			return
+		}
+		_, insertErr = fileTransactions.InsertOne(ctx, transaction)
 
 		if insertErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": insertErr.Error()})
@@ -127,6 +143,28 @@ func DownloadFile() gin.HandlerFunc {
 			return
 		}
 
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		transaction := models.FileTransaction{
+			ID:        primitive.NewObjectID(),
+			FileId:    fileID,
+			UserID:    record.UserID,
+			Operation: "download",
+			FileName:  record.FileName,
+			Timestamp: time.Now(),
+			FileSize:  record.FileSize,
+		}
+
+		_, insertErr := fileTransactions.InsertOne(context.TODO(), transaction)
+
+		if insertErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": insertErr.Error()})
+			return
+		}
+
 		// Set the Content-Disposition header to suggest a filename for the browser
 		c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", record.FileName))
 
@@ -144,7 +182,7 @@ func DeleteFile() gin.HandlerFunc {
 		fileID := c.Param("file_id")
 
 		// Retrieve file information from the database using the file ID
-		_, err := getFileById(fileID)
+		record, err := getFileById(fileID)
 		if err != nil {
 			c.JSON(http.StatusNotFound, gin.H{"error": "File not found"})
 			return
@@ -154,15 +192,31 @@ func DeleteFile() gin.HandlerFunc {
 		filePath := "user_file_uploads/" + fileID
 		err = os.Remove(filePath)
 		if err != nil {
-			fmt.Println("here")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
+		transaction := models.FileTransaction{
+			ID:        primitive.NewObjectID(),
+			FileId:    fileID,
+			UserID:    record.UserID,
+			Operation: "delete",
+			FileName:  record.FileName,
+			Timestamp: time.Now(),
+			FileSize:  record.FileSize,
+		}
+
+		_, insertErr := fileTransactions.InsertOne(ctx, transaction)
+
+		if insertErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": insertErr.Error()})
+			return
+		}
 		// Delete the file details from MongoDB
-		_, err = fileTransactionRecords.DeleteOne(ctx, bson.M{"fileid": fileID})
+		_, err = fileRecords.DeleteOne(ctx, bson.M{"file_id": fileID})
+
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete file details from database"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -182,7 +236,7 @@ func RetrieveFiles() gin.HandlerFunc {
 		}
 
 		var records []models.FileRecord
-		cursor, err := fileTransactionRecords.Find(ctx, bson.M{"user_id": userId})
+		cursor, err := fileRecords.Find(ctx, bson.M{"user_id": userId})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
@@ -195,16 +249,46 @@ func RetrieveFiles() gin.HandlerFunc {
 			return
 		}
 
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve files"})
-			return
-		}
-
 		// Sort files by size in ascending order
 		sort.Slice(records, func(i, j int) bool {
 			return records[i].FileSize < records[j].FileSize
 		})
 
-		c.JSON(http.StatusOK, records)
+		var files []string
+
+		for _, record := range records {
+			files = append(files, record.FileName)
+		}
+
+		c.JSON(http.StatusOK, files)
+	}
+}
+
+func AllTransactions() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+		defer cancel()
+		userId, exists := c.Get("uid")
+
+		if !exists {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "User id not found"})
+			return
+		}
+
+		var transactions []models.FileTransaction
+		cursor, err := fileTransactions.Find(ctx, bson.M{"user_id": userId})
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		defer cursor.Close(ctx)
+
+		err = cursor.All(ctx, &transactions)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, transactions)
 	}
 }

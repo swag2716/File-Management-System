@@ -11,6 +11,7 @@ import (
 )
 
 func main() {
+
 	err := godotenv.Load(".env")
 
 	if err != nil {
@@ -27,6 +28,7 @@ func main() {
 	router.Use(gin.Logger())
 
 	routes.AuthRoutes(router)
+	routes.FileRoutes(router)
 
 	router.Run(":" + port)
 }

@@ -254,13 +254,7 @@ func RetrieveFiles() gin.HandlerFunc {
 			return records[i].FileSize < records[j].FileSize
 		})
 
-		var files []string
-
-		for _, record := range records {
-			files = append(files, record.FileName)
-		}
-
-		c.JSON(http.StatusOK, files)
+		c.JSON(http.StatusOK, records)
 	}
 }
 
